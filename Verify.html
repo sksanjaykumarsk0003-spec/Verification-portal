@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://openfpcdn.io/fingerprintjs/v4/iife.min.js"></script>
+</head>
+<body>
+  <h3>Verifying your device...</h3>
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+
+    FingerprintJS.load().then(fp => fp.get()).then(result => {
+      const payload = {
+        visitorId: result.visitorId,
+        confidence: result.confidence.score,
+        platform: navigator.platform,
+        ua: navigator.userAgent,
+        tz: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+      tg.sendData(JSON.stringify(payload));
+      tg.close();
+    });
+  </script>
+</body>
+</html>
