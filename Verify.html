@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Device Verification</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      background-color: #18222d;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h2 { margin-bottom: 8px; }
+    p { color: #8a9aa8; font-size: 14px; line-height: 1.5; }
+    .btn {
+      background-color: #248bcf;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 280px;
+      margin-top: 25px;
+    }
+    .btn:disabled { background-color: #555555; cursor: not-allowed; }
+    #status {
+      margin-top: 18px;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 1.4;
+      max-width: 300px;
+    }
+    .err-msg { color: #ff5252; }
+    .success-msg { color: #4caf50; }
+  </style>
+</head>
+<body>
+
+  <div class="icon" id="portalIcon">🛡️</div>
+  <h2 id="portalTitle">Device Verification</h2>
+  <p id="portalDesc">Ek device par sirf ek account allowed hai.<br>Neeche button dabakar verify karein.</p>
+
+  <button class="btn" id="verifyBtn" onclick="processVerification()">Verify Karo</button>
+  <div id="status"></div>
+
+  <script>
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    if (tg) {
+      tg.expand();
+      tg.ready();
+    }
+
+    // Current Telegram User ID nikalna
+    const currentUserId = tg?.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null;
+
+    function getHardwareHash() {
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      ctx.textBaseline = "top";
+      ctx.font = "14px 'Arial'";
+      ctx.fillStyle = "#f60";
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = "#069";
+      ctx.fillText("DeviceToken", 2, 15);
+      let canvasData = canvas.toDataURL();
+
+      let rawSig = [
+        screen.width + "x" + screen.height,
+        screen.colorDepth,
+        navigator.hardwareConcurrency || "NA",
+        canvasData.slice(-40)
+      ].join("###");
+
+      let hash = 0;
+      for (let i = 0; i < rawSig.length; i++) {
+        let char = rawSig.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      return Math.abs(hash).toString(16);
+    }
+
+    // Web Page load hote hi check karega
+    window.onload = function() {
+      const savedUser = localStorage.getItem("verified_tg_user");
+      const isLocked = localStorage.getItem("device_verified_lock");
+
+      // Agar is device par pehle koi doosra user verify ho chuka hai
+      if (isLocked === "true" && savedUser && currentUserId && savedUser !== currentUserId) {
+        showBlockedScreen();
+      }
+    };
+
+    function showBlockedScreen() {
+      document.getElementById("portalIcon").innerText = "🚫";
+      document.getElementById("portalTitle").innerText = "Verification Failed!";
+      document.getElementById("portalDesc").innerHTML = "<b style='color:#ff5252;'>Multiple Accounts Detected!</b><br>Is physical device par pehle se ek account verified hai.";
+      const btn = document.getElementById("verifyBtn");
+      btn.disabled = true;
+      btn.innerText = "Access Blocked";
+      const status = document.getElementById("status");
+      status.className = "err-msg";
+      status.innerText = "Policy violation: Ek phone/device par sirf 1 account chal sakta hai.";
+    }
+
+    function processVerification() {
+      const btn = document.getElementById("verifyBtn");
+      const status = document.getElementById("status");
+      
+      const savedUser = localStorage.getItem("verified_tg_user");
+      const isLocked = localStorage.getItem("device_verified_lock");
+
+      // Immediate Web-side Reject
+      if (isLocked === "true" && savedUser && currentUserId && savedUser !== currentUserId) {
+        showBlockedScreen();
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "Verifying...";
+
+      try {
+        let hw = getHardwareHash();
+        let payload = {
+          device_hash: "dev_" + hw,
+          hw_hash: hw,
+          platform: "android"
+        };
+
+        // Device par lock lagana
+        if (currentUserId) {
+          localStorage.setItem("verified_tg_user", currentUserId);
+          localStorage.setItem("device_verified_lock", "true");
+        }
+
+        if (tg && tg.sendData) {
+          tg.sendData(JSON.stringify(payload));
+          setTimeout(() => {
+            tg.close();
+          }, 400);
+        } else {
+          status.className = "err-msg";
+          status.innerText = "Kripya Telegram application ke andar open karein.";
+          btn.disabled = false;
+          btn.innerText = "Verify Karo";
+        }
+      } catch (err) {
+        status.className = "err-msg";
+        status.innerText = "Error: " + err.message;
+        btn.disabled = false;
+        btn.innerText = "Verify Karo";
+      }
+    }
+  </script>
+</body>
+</html>
