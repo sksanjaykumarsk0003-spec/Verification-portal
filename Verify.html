@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" 
+        content="width=device-width, initial-scale=1.0">
+  <title>Device Verification</title>
+  <script 
+    src="https://telegram.org/js/telegram-web-app.js">
+  </script>
+  <style>
+    body {
+      background-color: #18222d;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+    .icon { font-size: 64px; margin-bottom: 20px; }
+    h2 { margin-bottom: 8px; }
+    p { color: #8a9aa8; font-size: 14px; line-height: 1.5; }
+    .btn {
+      background-color: #248bcf;
+      color: white;
+      border: none;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 10px;
+      cursor: pointer;
+      width: 100%;
+      max-width: 280px;
+      margin-top: 25px;
+    }
+    .btn:active { background-color: #1d72ab; }
+    #status { margin-top: 15px; font-size: 14px; color: #e53935; }
+  </style>
+</head>
+<body>
+
+  <div class="icon">🛡️</div>
+  <h2>Device Verification</h2>
+  <p>Ek device par sirf ek account allowed hai.<br>Neeche button dabakar verify karein.</p>
+
+  <button class="btn" id="verifyBtn" onclick="startVerification()">Verify Karo</button>
+  <div id="status"></div>
+
+  <script>
+    const tg = window.Telegram ? 
+               window.Telegram.WebApp : null;
+    if (tg) {
+      tg.expand();
+      tg.ready();
+    }
+
+    function getHardwareHash() {
+      let canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+      ctx.textBaseline = "top";
+      ctx.font = "14px 'Arial'";
+      ctx.fillStyle = "#f60";
+      ctx.fillRect(125, 1, 62, 20);
+      ctx.fillStyle = "#069";
+      ctx.fillText("DeviceToken", 2, 15);
+      let canvasData = canvas.toDataURL();
+
+      let rawSig = [
+        screen.width + "x" + screen.height,
+        screen.colorDepth,
+        navigator.hardwareConcurrency || "NA",
+        canvasData.slice(-40)
+      ].join("###");
+
+      let hash = 0;
+      for (let i = 0; i < rawSig.length; i++) {
+        let char = rawSig.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash |= 0;
+      }
+      return Math.abs(hash).toString(16);
+    }
+
+    function startVerification() {
+      const btn = document.getElementById("verifyBtn");
+      const status = document.getElementById("status");
+      btn.disabled = true;
+      btn.innerText = "Verifying...";
+
+      try {
+        let hw = getHardwareHash();
+        let payload = {
+          device_hash: "dev_" + hw,
+          hw_hash: hw,
+          platform: "android"
+        };
+
+        if (tg && tg.sendData) {
+          let str = JSON.stringify(payload);
+          tg.sendData(str);
+          tg.close();
+        } else {
+          status.innerText = "Kripya Telegram app me open karein.";
+          btn.disabled = false;
+          btn.innerText = "Verify Karo";
+        }
+      } catch (err) {
+        status.innerText = "Error: " + err.message;
+        btn.disabled = false;
+        btn.innerText = "Verify Karo";
+      }
+    }
+  </script>
+</body>
+</html>
